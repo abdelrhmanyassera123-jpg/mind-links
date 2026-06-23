@@ -35,7 +35,10 @@ loginBtn.addEventListener('click', handleLogin);
 loginPwd.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
 
 function handleLogin() {
-    const pwd = loginPwd.value;
+    let pwd = loginPwd.value.trim();
+    // Convert Arabic numerals to English just in case
+    pwd = pwd.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+    
     if (pwd === '0') {
         currentUserRole = 'user';
         loginOverlay.style.display = 'none';
