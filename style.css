@@ -261,5 +261,31 @@ body {
 }
 .upload-placeholder:hover { color: var(--text); background: rgba(255,255,255,0.05); }
 
-
-
+/* Data Controls Buttons */
+.glass-btn {
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+.glass-btn:hover {
+    background: rgba(168, 85, 247, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(168, 85, 247, 0.2);
+}
+.glass-btn:active {
+    transform: translateY(0);
+}

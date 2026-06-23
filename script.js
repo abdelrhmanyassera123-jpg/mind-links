@@ -523,3 +523,76 @@ window.addEventListener('drop', (e) => {
         });
     }
 });
+
+// ==========================================
+// Export & Import Data Features
+// ==========================================
+
+document.getElementById('export-btn').addEventListener('click', () => {
+    const data = localStorage.getItem('mindLinksData');
+    if (!data) {
+        alert('لا توجد بيانات حالية لتصديرها!');
+        return;
+    }
+    
+    // Create a Blob containing the JSON data
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create a temporary link to download the file
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Generate a filename with current date
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.download = `mind-links-backup-${dateStr}.json`;
+    
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+});
+
+const importBtn = document.getElementById('import-btn');
+const importFile = document.getElementById('import-file');
+
+importBtn.addEventListener('click', () => {
+    importFile.click();
+});
+
+importFile.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = event.target.result;
+            
+            // Validate that it's valid JSON
+            JSON.parse(data);
+            
+            // Save to localStorage
+            localStorage.setItem('mindLinksData', data);
+            
+            alert('تم استيراد البيانات بنجاح! سيتم إعادة تحميل الموقع لعرض أفكارك.');
+            location.reload();
+            
+        } catch (err) {
+            console.error(err);
+            if (err.name === 'QuotaExceededError') {
+                alert('عذراً، مساحة البيانات في هذا الملف كبيرة جداً (تتجاوز 5 ميجابايت) بسبب الصور الكبيرة.');
+            } else {
+                alert('عذراً، هذا الملف غير صالح أو تالف.');
+            }
+        }
+        
+        // Reset file input
+        importFile.value = '';
+    };
+    reader.readAsText(file);
+});

@@ -10,6 +10,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Data Controls -->
+    <div id="data-controls" style="position: absolute; top: 15px; left: 15px; z-index: 1000; display: flex; gap: 10px;">
+        <button id="export-btn" class="glass-btn" title="حفظ أفكاري كملف"><i class="fas fa-download"></i> تصدير (حفظ)</button>
+        <button id="import-btn" class="glass-btn" title="استرجاع أفكاري من ملف"><i class="fas fa-upload"></i> استيراد (رفع)</button>
+        <input type="file" id="import-file" style="display: none;" accept=".json">
+    </div>
+
     <!-- 3D Parallax Space Canvas -->
     <canvas id="space-canvas"></canvas>
     
