@@ -8,17 +8,12 @@ try {
     alert("عذراً، فشل تحميل ملفات الاتصال بقاعدة البيانات. تأكد من اتصال الإنترنت أو عطل مانع الإعلانات (AdBlocker).");
     console.error(err);
 }
-let currentUserRole = null; // 'user' or 'admin'
 let isAppLoading = true;
 
 // Elements
 const workspaceContainer = document.getElementById('workspace-container');
 const workspace = document.getElementById('workspace');
 const nodesLayer = document.getElementById('nodes-layer');
-const loginOverlay = document.getElementById('login-overlay');
-const loginPwd = document.getElementById('login-pwd');
-const loginBtn = document.getElementById('login-btn');
-const loginErr = document.getElementById('login-err');
 
 // Pan & Zoom State
 let panX = 0;
@@ -32,30 +27,6 @@ let startPanY = 0;
 let nodes = [];
 let nodeCounter = 0;
 let saveTimeout = null;
-
-// ==========================================
-// Login Flow
-// ==========================================
-loginBtn.addEventListener('click', handleLogin);
-loginPwd.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
-
-function handleLogin() {
-    let pwd = loginPwd.value.trim();
-    // Convert Arabic numerals to English just in case
-    pwd = pwd.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-    
-    if (pwd === '0') {
-        currentUserRole = 'user';
-        loginOverlay.style.display = 'none';
-        loadDataFromCloud();
-    } else if (pwd === '20111301') {
-        currentUserRole = 'admin';
-        loginOverlay.style.display = 'none';
-        loadDataFromCloud();
-    } else {
-        loginErr.style.display = 'block';
-    }
-}
 
 // ==========================================
 // Cloud Sync Logic
@@ -77,10 +48,6 @@ async function loadDataFromCloud() {
         
         if (state.nodes && state.nodes.length > 0) {
             state.nodes.forEach(n => {
-                // If current user is 'user', DO NOT load nodes that are 'private'
-                if (currentUserRole === 'user' && n.data.visibility === 'private') {
-                    return; // Skip rendering private admin nodes
-                }
                 createNode(n.x, n.y, n.data, false);
             });
         } else {
@@ -196,21 +163,13 @@ function createNode(x, y, data = {}, triggerCloudSave = true) {
     x = x || 0;
     y = y || 0;
 
-    // Default visibility is 'public' (everyone sees it)
-    if (!data.visibility) data.visibility = 'public';
-
     const hasLink = data.link && data.link.trim() !== '';
     const dateType = data.date ? 'date' : 'text';
     const timeType = data.time ? 'time' : 'text';
-    
-    // UI indicator for admin
-    let visibilityIcon = data.visibility === 'private' ? '<i class="fas fa-lock" style="color:#f43f5e; margin-left:5px;" title="خاص بي"></i>' : '<i class="fas fa-globe" style="color:#10b981; margin-left:5px;" title="للكل"></i>';
-    let visibilityHtml = currentUserRole === 'admin' ? `<div class="node-visibility" style="cursor:pointer; font-size:0.9rem;">${visibilityIcon}</div>` : '';
 
     el.innerHTML = `
         <div class="node-header">
             <div class="drag-handle" title="اسحب من هنا"><i class="fas fa-grip-vertical"></i></div>
-            ${visibilityHtml}
             <input type="text" class="node-title" placeholder="عنوان الفكرة..." value="${data.title || ''}">
             <div class="node-actions">
                 <button class="delete-btn"><i class="fas fa-times"></i></button>
@@ -265,31 +224,6 @@ function updateNodePosition(nodeObj) {
 function setupNodeInteractions(nodeObj) {
     const el = nodeObj.el;
     
-    // Visibility Toggle (Admin only)
-    if (currentUserRole === 'admin') {
-        const visBtn = el.querySelector('.node-visibility');
-        if (visBtn) {
-            visBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (nodeObj.data.visibility === 'public') {
-                    nodeObj.data.visibility = 'private';
-                    visBtn.innerHTML = '<i class="fas fa-lock" style="color:#f43f5e; margin-left:5px;" title="خاص بي"></i>';
-                } else {
-                    nodeObj.data.visibility = 'public';
-                    visBtn.innerHTML = '<i class="fas fa-globe" style="color:#10b981; margin-left:5px;" title="للكل"></i>';
-                }
-                triggerSave();
-            });
-            
-            // Also support right click on the node header to toggle
-            el.querySelector('.node-header').addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                visBtn.click();
-            });
-        }
-    }
-
     // Dragging
     let isDragging = false;
     let startX, startY, initialNodeX, initialNodeY;
@@ -580,3 +514,6 @@ document.getElementById('import-file').addEventListener('change', (e) => {
     };
     reader.readAsText(file);
 });
+
+// Load data immediately on start
+loadDataFromCloud();
