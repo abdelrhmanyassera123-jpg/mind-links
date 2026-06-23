@@ -8,8 +8,20 @@
     <link rel="stylesheet" href="style.css?v=1.1">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#030308;z-index:9999;display:flex;justify-content:center;align-items:center;flex-direction:column;gap:15px;">
+        <div style="background:rgba(20, 20, 35, 0.8);backdrop-filter:blur(10px);padding:40px;border-radius:20px;border:1px solid rgba(168,85,247,0.3);text-align:center;box-shadow:0 15px 35px rgba(0,0,0,0.6);">
+            <h2 style="margin-bottom:20px;color:white;">Mind Links</h2>
+            <input type="password" id="login-pwd" placeholder="أدخل كلمة المرور..." style="padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);margin-bottom:15px;width:100%;background:rgba(0,0,0,0.5);color:white;text-align:center;font-size:1.1rem;outline:none;">
+            <button id="login-btn" class="glass-btn" style="width:100%;justify-content:center;background:rgba(168,85,247,0.5);">دخول</button>
+            <p id="login-err" style="color:#f43f5e;margin-top:10px;display:none;font-size:0.9rem;">كلمة المرور غير صحيحة</p>
+        </div>
+    </div>
+
     <!-- Data Controls -->
     <div id="data-controls" style="position: absolute; top: 15px; left: 15px; z-index: 1000; display: flex; gap: 10px;">
         <button id="export-btn" class="glass-btn" title="حفظ أفكاري كملف"><i class="fas fa-download"></i> تصدير (حفظ)</button>
