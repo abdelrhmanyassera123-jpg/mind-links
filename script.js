@@ -1,8 +1,13 @@
 // ====== Supabase & Auth ======
 const supabaseUrl = 'https://nkintzpwhvxkplgxfpch.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5raW50enB3aHZ4a3BsZ3hmcGNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjY0MzgsImV4cCI6MjA5Nzc0MjQzOH0.e2Fku69QTdHLNJz8Z917hbWFgKaGPMGMOS7oqbF_eCc';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
+let supabase;
+try {
+    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+} catch (err) {
+    alert("عذراً، فشل تحميل ملفات الاتصال بقاعدة البيانات. تأكد من اتصال الإنترنت أو عطل مانع الإعلانات (AdBlocker).");
+    console.error(err);
+}
 let currentUserRole = null; // 'user' or 'admin'
 let isAppLoading = true;
 
