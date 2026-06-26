@@ -8,8 +8,19 @@
     <link rel="stylesheet" href="style.css">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase SDK Local -->
+    <script defer src="supabase.js"></script>
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('Global Error:', msg, url, line, col, error);
+        };
+        window.onunhandledrejection = function(e) {
+            var el = document.createElement('div');
+            el.style = 'color:red;z-index:9999;position:absolute;top:150px;background:black;padding:10px;left:50px;direction:ltr;text-align:left;font-family:monospace;';
+            el.innerHTML = 'PROMISE ERROR: ' + (e.reason ? e.reason.message : e.reason);
+            document.body.appendChild(el);
+        };
+    </script>
 </head>
 <body>    <!-- Data Controls -->
     <div id="data-controls" style="position: absolute; top: 15px; left: 15px; z-index: 1000; display: flex; gap: 10px;">
@@ -28,6 +39,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script defer src="app.js"></script>
 </body>
 </html>

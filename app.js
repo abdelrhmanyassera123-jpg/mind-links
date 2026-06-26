@@ -1,13 +1,66 @@
-// ====== Supabase & Auth ======
+// ====== Supabase & IndexedDB Auth ======
 const supabaseUrl = 'https://nkintzpwhvxkplgxfpch.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5raW50enB3aHZ4a3BsZ3hmcGNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjY0MzgsImV4cCI6MjA5Nzc0MjQzOH0.e2Fku69QTdHLNJz8Z917hbWFgKaGPMGMOS7oqbF_eCc';
-let supabase;
-try {
-    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-} catch (err) {
-    alert("عذراً، فشل تحميل ملفات الاتصال بقاعدة البيانات. تأكد من اتصال الإنترنت أو عطل مانع الإعلانات (AdBlocker).");
-    console.error(err);
+let supabaseClient = null;
+if (window.supabase) {
+    try {
+        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    } catch (e) {
+        console.warn('Failed to initialize Supabase client:', e);
+    }
 }
+
+// ====== Image Compression ======
+async function compressImage(file, maxWidth = 800) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/webp', 0.6));
+            };
+        };
+    });
+}
+
+const dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open('MindLinksDB', 1);
+    request.onupgradeneeded = e => e.target.result.createObjectStore('store');
+    request.onsuccess = e => resolve(e.target.result);
+    request.onerror = e => reject(e.target.error);
+});
+async function idbSet(key, val) {
+    const db = await dbPromise;
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('store', 'readwrite');
+        tx.objectStore('store').put(val, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+async function idbGet(key) {
+    const db = await dbPromise;
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('store', 'readonly');
+        const req = tx.objectStore('store').get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(tx.error);
+    });
+}
+
 let isAppLoading = true;
 
 // Elements
@@ -29,32 +82,57 @@ let nodeCounter = 0;
 let saveTimeout = null;
 
 // ==========================================
-// Cloud Sync Logic
+// Cloud & Local Sync Logic
 // ==========================================
+let cloudSubscription = null;
+
 async function loadDataFromCloud() {
     isAppLoading = true;
     try {
-        const { data, error } = await supabase.from('board_state').select('data').eq('id', 1).single();
-        
-        if (error || !data || !data.data) {
-            throw new Error('No data found');
+        let state = null;
+        if (supabaseClient) {
+            const { data, error } = await supabaseClient.from('board_state').select('data').eq('id', 1).single();
+            if (data && data.data) state = data.data;
         }
         
-        const state = data.data;
+        if (!state) {
+            const localStr = await idbGet('mindLinksData');
+            if (localStr) state = JSON.parse(localStr);
+        }
+
+        if (!state) throw new Error('No data found');
+        
         panX = state.panX || 0;
         panY = state.panY || 0;
         zoom = state.zoom || 1;
         updateWorkspace();
         
+        nodesLayer.innerHTML = '';
+        nodes = [];
         if (state.nodes && state.nodes.length > 0) {
-            state.nodes.forEach(n => {
-                createNode(n.x, n.y, n.data, false);
-            });
+            state.nodes.forEach(n => createNode(n.x, n.y, n.data, false));
         } else {
             createDefaultNode();
         }
+
+        // Setup Realtime Subscription
+        if (supabaseClient && !cloudSubscription) {
+            cloudSubscription = supabaseClient.channel('public:board_state')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'board_state' }, payload => {
+                    const newState = payload.new.data;
+                    if (newState) {
+                        isAppLoading = true;
+                        nodesLayer.innerHTML = '';
+                        nodes = [];
+                        if (newState.nodes) newState.nodes.forEach(n => createNode(n.x, n.y, n.data, false));
+                        isAppLoading = false;
+                        idbSet('mindLinksData', JSON.stringify(newState)); // backup locally
+                    }
+                })
+                .subscribe();
+        }
     } catch (err) {
-        console.warn('Failed to load cloud data, creating default node', err);
+        console.warn('Failed to load data, creating default node', err);
         createDefaultNode();
     }
     
@@ -88,11 +166,12 @@ async function saveDataToCloud() {
     };
     
     try {
-        await supabase.from('board_state').upsert({ id: 1, data: state });
-        // Also save a local backup just in case
-        localStorage.setItem('mindLinksData', JSON.stringify(state));
+        await idbSet('mindLinksData', JSON.stringify(state));
+        if (supabaseClient) {
+            await supabaseClient.from('board_state').upsert({ id: 1, data: state });
+        }
     } catch (e) {
-        console.warn('Failed to save to cloud', e);
+        console.warn('Failed to save data', e);
     }
 }
 
@@ -319,17 +398,14 @@ function setupNodeInteractions(nodeObj) {
     const placeholder = el.querySelector('.upload-placeholder');
 
     placeholder.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', async (e) => {
         if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                img.src = e.target.result;
-                img.style.display = 'block';
-                placeholder.style.display = 'none';
-                nodeObj.data.imageSrc = e.target.result;
-                triggerSave();
-            }
-            reader.readAsDataURL(e.target.files[0]);
+            const compressedBase64 = await compressImage(e.target.files[0]);
+            img.src = compressedBase64;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+            nodeObj.data.imageSrc = compressedBase64;
+            triggerSave();
         }
     });
 }
@@ -437,6 +513,7 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 const mouseParticles = [];
+let lastMouseX = 0, lastMouseY = 0;
 class MouseParticle {
     constructor(x, y) {
         this.x = x; this.y = y;
@@ -451,13 +528,19 @@ class MouseParticle {
     update() { this.x += this.speedX; this.y += this.speedY; this.life -= this.decay; }
     draw(ctx) {
         ctx.globalAlpha = this.life; ctx.fillStyle = this.color;
-        ctx.shadowBlur = 10; ctx.shadowColor = this.color;
         ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
     }
 }
 window.addEventListener('mousemove', (e) => {
-    for(let i=0; i<2; i++) mouseParticles.push(new MouseParticle(e.clientX, e.clientY));
+    const dist = Math.hypot(e.clientX - lastMouseX, e.clientY - lastMouseY);
+    if (dist > 5) {
+        mouseParticles.push(new MouseParticle(e.clientX, e.clientY));
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    }
+    if (mouseParticles.length > 40) {
+        mouseParticles.shift();
+    }
 });
 function drawSpace() {
     ctx.clearRect(0, 0, cw, ch);
@@ -470,7 +553,8 @@ function drawSpace() {
         const screenY = sy * Math.sqrt(zoom) + ch/2;
         if (screenX > 0 && screenX < cw && screenY > 0 && screenY < ch) {
             ctx.globalAlpha = s.alpha; ctx.fillStyle = s.color;
-            ctx.beginPath(); ctx.arc(screenX, screenY, s.radius * Math.sqrt(zoom), 0, Math.PI * 2); ctx.fill();
+            const size = s.radius * Math.sqrt(zoom) * 2;
+            ctx.fillRect(screenX - size/2, screenY - size/2, size, size);
         }
         s.alpha += (Math.random() - 0.5) * 0.1;
         if (s.alpha > 1) s.alpha = 1; if (s.alpha < 0.2) s.alpha = 0.2;
@@ -487,9 +571,19 @@ drawSpace();
 // Backup Export/Import (Optional)
 // ==========================================
 document.getElementById('export-btn').addEventListener('click', () => {
-    const data = localStorage.getItem('mindLinksData');
-    if (!data) return alert('لا توجد بيانات حالية لتصديرها!');
-    const blob = new Blob([data], { type: 'application/json' });
+    const serializedNodes = nodes.map(n => ({
+        x: n.x,
+        y: n.y,
+        data: n.data
+    }));
+    const state = {
+        panX,
+        panY,
+        zoom,
+        nodes: serializedNodes
+    };
+    const dataStr = JSON.stringify(state);
+    const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -505,11 +599,11 @@ document.getElementById('import-file').addEventListener('change', (e) => {
     reader.onload = async (event) => {
         try {
             const data = event.target.result;
-            JSON.parse(data);
-            await supabase.from('board_state').upsert({ id: 1, data: JSON.parse(data) });
-            alert('تم استيراد البيانات للسحابة بنجاح!');
+            const parsed = JSON.parse(data);
+            await idbSet('mindLinksData', JSON.stringify(parsed));
+            alert('تم استيراد البيانات بنجاح!');
             location.reload();
-        } catch (err) { alert('ملف غير صالح!'); }
+        } catch (err) { alert('حدث خطأ أثناء الاستيراد!'); console.error(err); }
         e.target.value = '';
     };
     reader.readAsText(file);
